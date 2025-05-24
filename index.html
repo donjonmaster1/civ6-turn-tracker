@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Civ6 Turn Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    #turn-btn {
+      padding: 1rem 2rem;
+      font-size: 1.5rem;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    #turn-btn:disabled {
+      background-color: gray;
+    }
+  </style>
+</head>
+<body>
+  <h1>Civ6 Turn Tracker</h1>
+  <p id="status">Waiting for players...</p>
+  <button id="turn-btn">I'm Done!</button>
+
+  <script>
+    // Simulated player list
+    const players = ["Alice", "Bob", "Cara", "Dave"];
+    let currentIndex = 0;
+
+    const status = document.getElementById("status");
+    const button = document.getElementById("turn-btn");
+
+    // Request notification permission
+    Notification.requestPermission().then(function(permission) {
+      if (permission !== "granted") {
+        alert("Please enable notifications to receive turn alerts.");
+      }
+    });
+
+    function notifyNextPlayer() {
+      const nextPlayer = players[(currentIndex + 1) % players.length];
+      new Notification(`It's your turn, ${nextPlayer}!`);
+    }
+
+    button.addEventListener("click", () => {
+      const currentPlayer = players[currentIndex];
+      currentIndex = (currentIndex + 1) % players.length;
+      const nextPlayer = players[currentIndex];
+      status.textContent = `Turn passed from ${currentPlayer} to ${nextPlayer}`;
+      notifyNextPlayer();
+    });
+  </script>
+</body>
+</html>
