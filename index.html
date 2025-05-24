@@ -72,6 +72,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js';
     import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
+    import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-messaging.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAy3AEStNYnd-pO-A2XEFmyuu4EgOEDGWs",
@@ -84,6 +85,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const messaging = getMessaging(app);
     const turnDocRef = doc(db, 'civ6', 'turn');
 
     const players = [
@@ -104,7 +106,7 @@
       const d = new Date();
       d.setTime(d.getTime() + (days*24*60*60*1000));
       const expires = "expires="+ d.toUTCString();
-      document.cookie = name + "=" + value + ";" + expires + ";path=/";
+      document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
     }
 
     function getCookie(name) {
@@ -112,7 +114,7 @@
       const ca = document.cookie.split(';');
       for(let i = 0; i < ca.length; i++) {
         let c = ca[i].trim();
-        if (c.indexOf(cname) === 0) return c.substring(cname.length, c.length);
+        if (c.indexOf(cname) === 0) return decodeURIComponent(c.substring(cname.length, c.length));
       }
       return "";
     }
@@ -123,6 +125,34 @@
       }
     }
 
+    async function getFcmToken() {
+      try {
+        // Replace with your public VAPID key generated in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+        const vapidKey = 'YOUR_PUBLIC_VAPID_KEY_HERE'; 
+        const currentToken = await getToken(messaging, { vapidKey });
+        if (currentToken) {
+          console.log('FCM Token:', currentToken);
+          return currentToken;
+        } else {
+          console.log('No registration token available. Request permission to generate one.');
+          return null;
+        }
+      } catch (err) {
+        console.log('An error occurred while retrieving token. ', err);
+        return null;
+      }
+    }
+
+    async function saveTokenForPlayer(player, token) {
+      if (!player || !token) return;
+      try {
+        await setDoc(doc(db, 'tokens', player), { token });
+      } catch (e) {
+        console.error("Error saving token", e);
+      }
+    }
+
+    // Listen to turn changes and notify if it’s your turn (fallback for when page is active)
     onSnapshot(turnDocRef, (docSnap) => {
       const data = docSnap.data();
       const index = data?.turnIndex ?? 0;
@@ -130,7 +160,9 @@
 
       const currentPlayer = players[index];
       const savedName = getCookie("civ6player");
+
       if (currentPlayer === savedName && Notification.permission === "granted") {
+        // Show local notification as fallback if app is foreground
         new Notification(`It's your turn, ${savedName}!`);
       }
     });
@@ -159,20 +191,43 @@
       document.body.classList.toggle("dark-mode");
     });
 
-    playerSelect.addEventListener("change", () => {
+    playerSelect.addEventListener("change", async () => {
       const selected = playerSelect.value;
       if (selected) {
         setCookie("civ6player", selected, 30);
         requestNotificationPermission();
+        const token = await getFcmToken();
+        if (token) {
+          await saveTokenForPlayer(selected, token);
+        }
       }
     });
 
-    window.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener("DOMContentLoaded", async () => {
       const saved = getCookie("civ6player");
       if (saved) {
         playerSelect.value = saved;
+        requestNotificationPermission();
+        const token = await getFcmToken();
+        if (token) {
+          await saveTokenForPlayer(saved, token);
+        }
       }
     });
+
+    // Optional: handle messages when app is in foreground
+    onMessage(messaging, (payload) => {
+      console.log('Message received. ', payload);
+      if (Notification.permission === 'granted') {
+        const notificationTitle = payload.notification.title;
+        const notificationOptions = {
+          body: payload.notification.body,
+          icon: '/icons/icon-192x192.png' // optional icon
+        };
+        new Notification(notificationTitle, notificationOptions);
+      }
+    });
+
   </script>
 </body>
 </html>
