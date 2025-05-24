@@ -9,6 +9,9 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 2rem;
+      background: url('https://cdn.cloudflare.steamstatic.com/steam/apps/289070/header.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: white;
     }
     #turn-btn {
       padding: 1rem 2rem;
@@ -22,40 +25,109 @@
     #turn-btn:disabled {
       background-color: gray;
     }
+    #dark-mode-btn {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #leaderboard {
+      margin-top: 2rem;
+      font-size: 1.25rem;
+      animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
   <h1>Civ6 Turn Tracker</h1>
   <p id="status">Waiting for players...</p>
   <button id="turn-btn">I'm Done!</button>
+  <button id="dark-mode-btn">Toggle Dark Mode</button>
+  <div id="leaderboard"></div>
 
-  <script>
-    // Simulated player list
-    const players = ["Alice", "Bob", "Cara", "Dave"];
-    let currentIndex = 0;
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js';
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAy3AEStNYnd-pO-A2XEFmyuu4EgOEDGWs",
+      authDomain: "civ6-turn-tracker.firebaseapp.com",
+      projectId: "civ6-turn-tracker",
+      storageBucket: "civ6-turn-tracker.firebasestorage.app",
+      messagingSenderId: "208276184108",
+      appId: "1:208276184108:web:2a7983c6a56ef5d3bbc589"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const turnDocRef = doc(db, 'civ6', 'turn');
+
+    const players = [
+      "Andrew 🤓",
+      "Joy 🥰",
+      "Lee 💻",
+      "Phillip ☢️",
+      "Bo 🚬"
+    ];
 
     const status = document.getElementById("status");
     const button = document.getElementById("turn-btn");
+    const leaderboard = document.getElementById("leaderboard");
+    const darkModeBtn = document.getElementById("dark-mode-btn");
 
-    // Request notification permission
-    Notification.requestPermission().then(function(permission) {
+    Notification.requestPermission().then(permission => {
       if (permission !== "granted") {
         alert("Please enable notifications to receive turn alerts.");
       }
     });
 
-    function notifyNextPlayer() {
-      const nextPlayer = players[(currentIndex + 1) % players.length];
-      new Notification(`It's your turn, ${nextPlayer}!`);
+    onSnapshot(turnDocRef, (docSnap) => {
+      const data = docSnap.data();
+      const index = data?.turnIndex ?? 0;
+      updateUI(index);
+    });
+
+    button.addEventListener("click", async () => {
+      const docSnap = await getDoc(turnDocRef);
+      const index = docSnap.exists() ? docSnap.data().turnIndex ?? 0 : 0;
+      const nextIndex = (index + 1) % players.length;
+      await setDoc(turnDocRef, { turnIndex: nextIndex });
+      notifyNextPlayer(players[nextIndex]);
+    });
+
+    function notifyNextPlayer(name) {
+      new Notification(`It's your turn, ${name}!`);
     }
 
-    button.addEventListener("click", () => {
-      const currentPlayer = players[currentIndex];
-      currentIndex = (currentIndex + 1) % players.length;
-      const nextPlayer = players[currentIndex];
-      status.textContent = `Turn passed from ${currentPlayer} to ${nextPlayer}`;
-      notifyNextPlayer();
+    function updateUI(index) {
+      const current = players[index];
+      const next = players[(index + 1) % players.length];
+      status.textContent = `Turn passed to ${current}`;
+
+      let orderHTML = '<h2>Upcoming Turns</h2><ul style="list-style: none; padding: 0;">';
+      for (let i = 1; i <= 5; i++) {
+        const p = players[(index + i) % players.length];
+        orderHTML += `<li>${i}. ${p}</li>`;
+      }
+      orderHTML += '</ul>';
+      leaderboard.innerHTML = orderHTML;
+    }
+
+    darkModeBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+      if (document.body.classList.contains("dark-mode")) {
+        document.body.style.backgroundColor = "#121212";
+        document.body.style.color = "#f0f0f0";
+      } else {
+        document.body.style.backgroundColor = "";
+        document.body.style.color = "";
+      }
     });
   </script>
 </body>
 </html>
+
