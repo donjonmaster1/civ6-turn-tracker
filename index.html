@@ -128,7 +128,7 @@
     async function getFcmToken() {
       try {
         // Replace with your public VAPID key generated in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
-        const vapidKey = 'YOUR_PUBLIC_VAPID_KEY_HERE'; 
+        const vapidKey = '208276184108'; 
         const currentToken = await getToken(messaging, { vapidKey });
         if (currentToken) {
           console.log('FCM Token:', currentToken);
