@@ -39,6 +39,10 @@
       font-size: 1.25rem;
       animation: fadeIn 1s ease-in-out;
     }
+    #player-select {
+      margin-top: 1rem;
+      font-size: 1rem;
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -50,6 +54,19 @@
   <p id="status">Waiting for players...</p>
   <button id="turn-btn">I'm Done!</button>
   <button id="dark-mode-btn">Toggle Dark Mode</button>
+
+  <div id="player-select">
+    <label for="player">Select yourself: </label>
+    <select id="player">
+      <option value="">--Choose--</option>
+      <option value="Andrew 🤓">Andrew 🤓</option>
+      <option value="Joy 🥰">Joy 🥰</option>
+      <option value="Lee 💻">Lee 💻</option>
+      <option value="Phillip ☢️">Phillip ☢️</option>
+      <option value="Bo 🚬">Bo 🚬</option>
+    </select>
+  </div>
+
   <div id="leaderboard"></div>
 
   <script type="module">
@@ -81,17 +98,41 @@
     const button = document.getElementById("turn-btn");
     const leaderboard = document.getElementById("leaderboard");
     const darkModeBtn = document.getElementById("dark-mode-btn");
+    const playerSelect = document.getElementById("player");
 
-    Notification.requestPermission().then(permission => {
-      if (permission !== "granted") {
-        alert("Please enable notifications to receive turn alerts.");
+    function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + (days*24*60*60*1000));
+      const expires = "expires="+ d.toUTCString();
+      document.cookie = name + "=" + value + ";" + expires + ";path=/";
+    }
+
+    function getCookie(name) {
+      const cname = name + "=";
+      const ca = document.cookie.split(';');
+      for(let i = 0; i < ca.length; i++) {
+        let c = ca[i].trim();
+        if (c.indexOf(cname) === 0) return c.substring(cname.length, c.length);
       }
-    });
+      return "";
+    }
+
+    function requestNotificationPermission() {
+      if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+      }
+    }
 
     onSnapshot(turnDocRef, (docSnap) => {
       const data = docSnap.data();
       const index = data?.turnIndex ?? 0;
       updateUI(index);
+
+      const currentPlayer = players[index];
+      const savedName = getCookie("civ6player");
+      if (currentPlayer === savedName && Notification.permission === "granted") {
+        new Notification(`It's your turn, ${savedName}!`);
+      }
     });
 
     button.addEventListener("click", async () => {
@@ -99,16 +140,10 @@
       const index = docSnap.exists() ? docSnap.data().turnIndex ?? 0 : 0;
       const nextIndex = (index + 1) % players.length;
       await setDoc(turnDocRef, { turnIndex: nextIndex });
-      notifyNextPlayer(players[nextIndex]);
     });
-
-    function notifyNextPlayer(name) {
-      new Notification(`It's your turn, ${name}!`);
-    }
 
     function updateUI(index) {
       const current = players[index];
-      const next = players[(index + 1) % players.length];
       status.textContent = `Turn passed to ${current}`;
 
       let orderHTML = '<h2>Upcoming Turns</h2><ul style="list-style: none; padding: 0;">';
@@ -122,6 +157,21 @@
 
     darkModeBtn.addEventListener("click", () => {
       document.body.classList.toggle("dark-mode");
+    });
+
+    playerSelect.addEventListener("change", () => {
+      const selected = playerSelect.value;
+      if (selected) {
+        setCookie("civ6player", selected, 30);
+        requestNotificationPermission();
+      }
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const saved = getCookie("civ6player");
+      if (saved) {
+        playerSelect.value = saved;
+      }
     });
   </script>
 </body>
